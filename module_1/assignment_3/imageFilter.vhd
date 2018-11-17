@@ -77,7 +77,7 @@ architecture Behavioral of imageFilter is
 
   -- Signal declaration
   type state_type is (
-            STATE_INIT, STATE_PROCESSING, STATE_CHECK, STATE_READ_1, STATE_READ_2
+            STATE_INIT, STATE_PROCESSING, STATE_CHECK, STATE_READ_1, STATE_READ_2, STATE_READ_3
             );
             
   signal state        : state_type := STATE_INIT;
@@ -85,8 +85,8 @@ architecture Behavioral of imageFilter is
   -- count number of times a pixel was processed
     signal n_pixel: integer range 0 to to_integer(NBR_PIXELS) := 0;  -- 120*90
     signal addr: std_logic_vector(ADDR_WIDTH-1 downto 0) := (others=>'0');
-    signal pixel_0, pixel_1, pixel_2, pixel_3, pixel_4, pixel_5: unsigned(DATA_WIDTH downto 0) := (others=>'0');
-    
+    signal pixel_0, pixel_1, pixel_2, pixel_3, pixel_4, pixel_5: unsigned(DATA_WIDTH -1 downto 0) := (others=>'0');
+    signal bram_frame_out_din_temp : integer := 0 ;
     
   -- Read port 0 of BRAM frame_in
   -- Address port 0
@@ -166,21 +166,20 @@ begin
                   bram_frame_out_we <= '0';
                   
                   -- check if done
-                  if (n_pixel = NBR_PIXELS-1) then
+                  if (n_pixel = NBR_PIXELS) then
                     n_pixel <= 0;
+                    addr <= (others=>'0');
                     done <= '1';
                     idle <= '1';
                     state <= STATE_INIT;
                   -- check if border (<=119, >=10680, %120, %119)
-                  elsif ((n_pixel <= (N_COLS_INT-1)) or (n_pixel >= NBR_PIXELS-N_COLS_INT) or ((n_pixel mod N_COLS_INT) = 0) or ((n_pixel mod (N_COLS_INT-1)) = 0)) then
+                  elsif ((n_pixel <= (N_COLS_INT-1)) or (n_pixel >= NBR_PIXELS-N_COLS_INT) or ((n_pixel mod N_COLS_INT) = 0) or ((n_pixel mod N_COLS_INT) = (N_COLS_INT - 1))) then
                     -- read next pixel
-                    bram_frame_in_raddr_0 <= addr;
-                    -- just write the current pixel out
-                    bram_frame_out_din <= bram_frame_in_dout_0;
-                    bram_frame_out_we <= '1';
-                    bram_frame_out_waddr <= addr;
-                    addr <= std_logic_vector(unsigned(addr) + 1);
-                    n_pixel <= n_pixel + 1;
+                      bram_frame_out_waddr <= std_logic_vector(unsigned(addr));
+                      bram_frame_out_we <= '1';
+                      bram_frame_out_din <= (others=>'0');
+                      addr <= std_logic_vector(unsigned(addr) + 1);
+                      n_pixel <= n_pixel + 1;
                   else
                     -- read next pixels
                     bram_frame_in_raddr_0 <= std_logic_vector(unsigned(addr)-N_COLS_INT-1);  -- -121
@@ -188,17 +187,8 @@ begin
                     bram_frame_in_raddr_2 <= std_logic_vector(unsigned(addr)-N_COLS_INT+1);  -- -119 
                     state <= STATE_READ_1;
                   end if;
-           -- when STATE_PROC_SIMPLE =>                
-                -- updates
-             --   addr <= std_logic_vector(unsigned(addr) + 1);
-              --  n_pixel <= n_pixel + 1;
-               -- state <= STATE_CHECK;
+            
             when STATE_READ_1 =>
-                -- read next pixels
-                pixel_0 <= unsigned(bram_frame_in_dout_0);
-                pixel_1 <= unsigned(bram_frame_in_dout_1);
-                pixel_2 <= unsigned(bram_frame_in_dout_2);
-                
                 -- set next addreses
                 bram_frame_in_raddr_0 <= std_logic_vector(unsigned(addr)+N_COLS_INT-1);  -- +119
                 bram_frame_in_raddr_1 <= std_logic_vector(unsigned(addr)+N_COLS_INT);  -- +120
@@ -206,19 +196,29 @@ begin
                 state <= STATE_READ_2;
             
             when STATE_READ_2 =>
+                            -- read next pixels
+                pixel_0 <= unsigned(bram_frame_in_dout_0);
+                pixel_1 <= unsigned(bram_frame_in_dout_1);
+                pixel_2 <= unsigned(bram_frame_in_dout_2);
+                state <= STATE_READ_3;
+                
+            when STATE_READ_3 =>
                 -- read next pixels
                 pixel_3 <= unsigned(bram_frame_in_dout_0);
                 pixel_4 <= unsigned(bram_frame_in_dout_1);
                 pixel_5 <= unsigned(bram_frame_in_dout_2);
                 
-                -- set write address and enable
-                bram_frame_out_waddr <= std_logic_vector(unsigned(addr));
-                bram_frame_out_we <= '1';
-                state <= STATE_PROCESSING;
+                -- doing some pre-calculation
+                bram_frame_out_din_temp <= to_integer(pixel_0) + 2*to_integer(pixel_1) + to_integer(pixel_2);
                 
+                state <= STATE_PROCESSING;
+
             when STATE_PROCESSING =>
                 -- apply horizontal sobel filter
-                bram_frame_out_din <= std_logic_vector(to_signed((to_integer(pixel_0) + 2*to_integer(pixel_1) + to_integer(pixel_2) - to_integer(pixel_3) - 2*to_integer(pixel_4) - to_integer(pixel_5)/8), 8));
+               -- set write address and enable
+                bram_frame_out_waddr <= std_logic_vector(unsigned(addr));
+                bram_frame_out_we <= '1';
+                bram_frame_out_din <= std_logic_vector(to_signed(((bram_frame_out_din_temp - to_integer(pixel_3) - 2*to_integer(pixel_4) - to_integer(pixel_5))/8), 8));
                 
                 -- updates
                 addr <= std_logic_vector(unsigned(addr) + 1);

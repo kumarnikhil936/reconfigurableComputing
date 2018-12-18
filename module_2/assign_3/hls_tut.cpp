@@ -42,6 +42,7 @@ void assign_2(stream_in_t& inStream, stream_out_t& outStream) {
 
 	// process DATA_HEIGHT-2 rows
 	proc : do {
+#pragma HLS LOOP_TRIPCOUNT min=10000 max=10000 avg=10000
 		// compute filter for current pixel
 		process : {
 		    g_x = 0;

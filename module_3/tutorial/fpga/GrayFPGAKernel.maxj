@@ -1,0 +1,36 @@
+package gray;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVector;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVectorType;
+
+public class GrayFPGAKernel extends Kernel {
+	GrayFPGAKernel(KernelParameters parameters) {
+		super(parameters);
+
+		final int channels = 4;
+
+		/* Value range, input data: 0 <= i <= +255 --> U 2**8  */
+		DFEFix channelIOType				=
+		/* Value range, sum of RGB: 0 <= i <= +765 --> U 2**10 */
+		DFEFix channelSumType				=
+
+		/* Define data type of streams */
+		DFEVectorType<DFEVar> pixelIOType	=
+
+		/* Input and output streams */
+		DFEVector<DFEVar> inPixel			=
+		DFEVector<DFEVar> outPixel			=
+
+		/* Internally used streams */
+		DFEVar sumPixel						=
+		DFEVar divPixel						=
+
+		/* DFG implementation */
+
+		/* Set output data stream */
+	}
+}

@@ -1,0 +1,62 @@
+package gray;
+
+import com.maxeler.maxcompiler.v2.build.EngineParameters;
+import com.maxeler.maxcompiler.v2.managers.BuildConfig;
+import com.maxeler.maxcompiler.v2.managers.BuildConfig.Effort;
+import com.maxeler.maxcompiler.v2.managers.custom.CustomManager;
+import com.maxeler.maxcompiler.v2.managers.custom.DFELink;
+import com.maxeler.maxcompiler.v2.managers.custom.blocks.KernelBlock;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.CPUTypes;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface.Direction;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.InterfaceParam;
+
+public class GrayFPGAManager extends CustomManager {
+	public GrayFPGAManager(EngineParameters engineParameters) {
+		super(engineParameters);
+
+		/* CPU <-> FPGA links */
+		DFELink fromCPU	=
+		DFELink toCPU	=
+
+		/* Add instance of GrayFPGAKernel */
+		KernelBlock kGrayFPGA =
+
+		/* Connect streams fromCPU/toCPU with kernel */
+		<== fromCPU;
+		toCPU <==
+	}
+
+	static EngineInterface interfaceGrayFPGA(String name) {
+		EngineInterface ei		= new EngineInterface(name);
+
+		/* Add image size-related parameters to CPU interface */
+		InterfaceParam rows		=
+		InterfaceParam columns	=
+		InterfaceParam picSize	= rows * columns;
+
+		/* Add streams to CPU interface */
+
+		/* Set number of ticks */
+
+		ei.ignoreAll(Direction.IN_OUT);
+
+		return ei;
+	}
+
+	public static void main(String[] args) {
+		EngineParameters params	= new EngineParameters(args);
+		GrayFPGAManager manager	= new GrayFPGAManager(params);
+
+		/* Create interface */
+
+		BuildConfig bc = manager.getBuildConfig();
+		bc.setEnableTimingAnalysis(true);
+		bc.setBuildEffort(Effort.HIGH);
+		bc.setMPPRCostTableSearchRange(1,24);
+		bc.setMPPRParallelism(4);
+		bc.setMPPRContinueAfterMeetingTiming(false);
+
+		manager.build();
+	}
+}

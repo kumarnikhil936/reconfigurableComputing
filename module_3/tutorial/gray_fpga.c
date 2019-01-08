@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <stdint.h>
+
+void gray_max(uint8_t *image_out, uint8_t *image_in, uint32_t columns, uint32_t rows);
 
 static void init(void);
 static void quit(void);
@@ -13,7 +16,7 @@ static void run(const gchar *name, gint nparams, const GimpParam *param, gint *n
 static void time_measure(struct timespec *time);
 static gdouble time_diff(struct timespec *start, struct timespec *end);
 
-static void sobel_cpu (GimpDrawable *drawable);
+static void gray_fpga (GimpDrawable *drawable);
 
 GimpPlugInInfo PLUG_IN_INFO = {
 	init,
@@ -45,13 +48,13 @@ static void query(void) {
 	};
 	
 	gimp_install_procedure (
-		"sobel_cpu",
-		"Sobel Edge Detection Operator on CPU.",
-		"Performs Sobel Operator on an Input Image.",
+		"gray_fpga",
+		"RGB to Gray Operator for FPGAs.",
+		"Creates a Gray Image of an RGB Input Image.",
 		"Achim Loesch",
 		"Copyright Achim Loesch",
 		"2017",
-		"Sobel@CPU...",
+		"Gray@FPGA...",
 		"RGBA",
 		GIMP_PLUGIN,
 		G_N_ELEMENTS(args), 0,
@@ -59,7 +62,7 @@ static void query(void) {
 	);
 	
 	gimp_plugin_menu_register (
-		"sobel_cpu",
+		"gray_fpga",
 		"<Image>/Filters/Misc"
 	);
 }
@@ -80,7 +83,7 @@ static void run(const gchar *name, gint nparams, const GimpParam *param, gint *n
 	
 	drawable	= gimp_drawable_get(param[2].data.d_drawable);
 	
-	sobel_cpu(drawable);
+	gray_fpga(drawable);
 	
 	gimp_displays_flush();
 	gimp_drawable_detach(drawable);
@@ -108,7 +111,7 @@ static gdouble time_diff(struct timespec *start, struct timespec *end) {
 	return diff;
 }
 
-static void sobel_cpu(GimpDrawable *drawable) {
+static void gray_fpga(GimpDrawable *drawable) {
 	struct timespec start;
 	struct timespec end;
 	gdouble diff	= 0.0;
@@ -146,45 +149,10 @@ static void sobel_cpu(GimpDrawable *drawable) {
 	
 	time_measure(&start);
 	
-	gint filter_x[] = { 1,  2,  1,  0,  0,  0, -1, -2, -1};
-	gint filter_y[] = { 1,  0, -1,  2,  0, -2,  1,  0, -1};
-	
-	for (i=y1; i<y2; i++) {
-		if (i % ((y2-y1)/10) == 0) {
-			gimp_progress_update((gdouble)i / (gdouble)(y2 - y1));
-		}
-		for (j=x1; j<x2; j++) {
-			/*
-			 * ADD CODE HERE.
-			 */
-			// boundary check and zero
-			if (i == y1 || i == (y2-1) || j == x1 || j == (x2-1)){
-				image_out[(j+x2*i)*4+0] = 0;
-				image_out[(j+x2*i)*4+1] = 0;
-				image_out[(j+x2*i)*4+2] = 0;	
-				image_out[(j+x2*i)*4+3] = 255;
-			}
-			else{
-		                gint c, k, l;
-				for (c=0; c<4; c++){
-					if (c != 3){
-						gint result_x = 0;
-						gint result_y = 0;
-						for (k=0; k<3; k++){
-							for (l=0; l<3; l++){
-								result_x += filter_x[k*3+l] * image_in[((j+x2*i-1-x2)+l+k*x2)*4+c];
-								result_y += filter_y[k*3+l] * image_in[((j+x2*i-1-x2)+l+k*x2)*4+c];
-							}			
-						}
-						image_out[(j+x2*i)*4+c] =  (abs(result_x) + abs(result_y)) >> 3;
-						//image_out[(j+x2*i)*4+c] = sqrt(pow(result_x, 2) + pow(result_y, 2));
-					} else{
-					image_out[(j+x2*i)*4+c] =  255;
-					}
-				}
-			}
-		}
-	}
+	/*
+	 * ADD CODE HERE.
+	 */
+	gray_max_new(image_out, image_in, x2, y2);
 	
 	time_measure(&end);
 	diff = time_diff(&start, &end);

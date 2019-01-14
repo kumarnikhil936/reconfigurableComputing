@@ -1,0 +1,67 @@
+
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.CounterChain;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Stream.OffsetExpr;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+
+public class SobelFPGAKernel extends Kernel {
+	SobelFPGAKernel(KernelParameters parameters) {
+		super(parameters);
+
+		/* Value range, input data: 0 <= i <= +255 --> U 2**8  */
+		DFEFix channelIOType				= dfeUInt(8);
+		DFEFix addIOType					= dfeInt(11);
+
+		/* Input and output streams */
+		DFEVar inPixel			= io.input("dataIn", channelIOType);
+		DFEVar width 			= io.scalarInput("width", dfeUInt(12));
+		DFEVar height 			= io.scalarInput("height", dfeUInt(12));
+		OffsetExpr n_w 			= stream.makeOffsetParam("n_w", 0, 4096);
+		DFEVar outPixel			= channelIOType.newInstance(this);
+
+		/*counter*/
+		CounterChain chain = control.count.makeCounterChain();
+		DFEVar h_cha = chain.addCounter(height, 1);
+		DFEVar w_cha = chain.addCounter(width, 1);
+		DFEVar c_cha = chain.addCounter(4, 1);
+
+		/* control signals */
+		DFEVar c_con = (c_cha < 3);
+		DFEVar w_min_con = (w_cha > 0);
+		DFEVar w_max_con = (w_cha < width-1);
+		DFEVar h_min_con = (h_cha > 0);
+		DFEVar h_max_con = (h_cha < height-1);
+		DFEVar con = (c_con & w_min_con & w_max_con & w_max_con & h_min_con & h_max_con);
+
+		/*reading all required input pixel*/
+		DFEVar inPix_tl = stream.offset(inPixel, (-n_w-1)*4);
+		DFEVar inPix_t = stream.offset(inPixel, (-n_w*4));
+		DFEVar inPix_tr = stream.offset(inPixel, (-n_w+1)*4);
+		DFEVar inPix_l = stream.offset(inPixel, -1*4);
+		DFEVar inPix_r = stream.offset(inPixel, 1*4);
+		DFEVar inPix_bl = stream.offset(inPixel, (n_w-1)*4);
+		DFEVar inPix_b = stream.offset(inPixel, (n_w)*4);
+		DFEVar inPix_br = stream.offset(inPixel, (n_w+1)*4);
+
+		/*Convolution per filter*/
+		DFEVar filt_x = inPix_tl.cast(addIOType) + (inPix_t*2).cast(addIOType) + inPix_tr.cast(addIOType) + (inPix_bl*-1).cast(addIOType) + (inPix_b*-2).cast(addIOType) + (inPix_br*-1).cast(addIOType);
+		DFEVar filt_y = inPix_tl.cast(addIOType) + (inPix_tr*-1).cast(addIOType) + (inPix_l*2).cast(addIOType) + (inPix_r*-2).cast(addIOType) + inPix_bl.cast(addIOType) + (inPix_br*-1).cast(addIOType);
+
+		/*add both filters together*/
+		DFEVar filt_x_con = (filt_x > 0);
+		DFEVar filt_x_abs = filt_x_con ? filt_x_con : filt_x_con*-1;
+		DFEVar filt_y_con = (filt_y > 0);
+		DFEVar filt_y_abs = filt_y_con ? filt_y_con : filt_y_con*-1;
+		DFEVar res = (filt_x_abs + filt_y_abs).cast(channelIOType);
+
+		/*write out correct values*/
+		DFEVar res_center = con ? res : 0;
+		outPixel <== c_con ? res_center : 255;
+
+		/* Set output data stream */
+		io.output("dataOut", outPixel, channelIOType);
+	}
+}

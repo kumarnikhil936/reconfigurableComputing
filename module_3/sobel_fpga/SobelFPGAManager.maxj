@@ -1,3 +1,4 @@
+package sobel;
 
 
 import com.maxeler.maxcompiler.v2.build.EngineParameters;
@@ -35,11 +36,11 @@ public class SobelFPGAManager extends CustomManager {
 		InterfaceParam height	= ei.addParam("height", CPUTypes.UINT32);
 		InterfaceParam picSize	= width * height;
 
-		ei.setStream("dataIn", CPUTypes.UINT8, picSize*CPUTypes.UINT8.sizeInBytes());
-		ei.setScalar("width", "width", width);
-		ei.setScalar("height", "height", height);
-		ei.setOffset("n_w", "n_w", width);
-		ei.setStream("dataOut", CPUTypes.UINT8, picSize*CPUTypes.UINT8.sizeInBytes());
+		ei.setStream("dataIn", CPUTypes.UINT8, picSize*4*CPUTypes.UINT8.sizeInBytes());
+		ei.setScalar("SobelFPGAKernel", "width", width);
+		ei.setScalar("SobelFPGAKernel", "height", height);
+		ei.setOffset("SobelFPGAKernel", "n_w", width);
+		ei.setStream("dataOut", CPUTypes.UINT8, picSize*4*CPUTypes.UINT8.sizeInBytes());
 
 		/* Set number of ticks */
 		ei.setTicks("SobelFPGAKernel", picSize*4);

@@ -1,0 +1,74 @@
+package sobel;
+
+
+import com.maxeler.maxcompiler.v2.build.EngineParameters;
+import com.maxeler.maxcompiler.v2.managers.BuildConfig;
+import com.maxeler.maxcompiler.v2.managers.BuildConfig.Effort;
+import com.maxeler.maxcompiler.v2.managers.custom.CustomManager;
+import com.maxeler.maxcompiler.v2.managers.custom.DFELink;
+import com.maxeler.maxcompiler.v2.managers.custom.blocks.KernelBlock;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.CPUTypes;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface.Direction;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.InterfaceParam;
+
+public class SobelFPGAManager extends CustomManager {
+	static int n_p = 8;
+
+	public SobelFPGAManager(EngineParameters engineParameters) {
+		super(engineParameters);
+
+		/* CPU <-> FPGA links */
+		DFELink fromCPU	= addStreamFromCPU("dataIn");
+		DFELink toCPU	= addStreamToCPU("dataOut");
+
+		/* Add instance of SobelFPGAKernel */
+		KernelBlock SobelFPGA = addKernel(new SobelFPGAKernel(makeKernelParameters("SobelFPGAKernel"), n_p));
+
+		/* Connect streams fromCPU/toCPU with kernel */
+		SobelFPGA.getInput("dataIn") <== fromCPU;
+		toCPU <== SobelFPGA.getOutput("dataOut");
+	}
+
+	static EngineInterface interfaceSobelFPGA(String name) {
+		EngineInterface ei		= new EngineInterface(name);
+
+		/* Add image size-related parameters to CPU interface */
+		InterfaceParam width	= ei.addParam("width", CPUTypes.UINT32);
+		InterfaceParam height	= ei.addParam("height", CPUTypes.UINT32);
+		InterfaceParam picSize	= width * height;
+
+
+		ei.setStream("dataIn", CPUTypes.UINT8, picSize*4*CPUTypes.UINT8.sizeInBytes());
+		ei.setScalar("SobelFPGAKernel", "width", width);
+		ei.setScalar("SobelFPGAKernel", "height", height);
+		ei.setOffset("SobelFPGAKernel", "n_w", width);
+		ei.setStream("dataOut", CPUTypes.UINT8, picSize*4*CPUTypes.UINT8.sizeInBytes());
+
+		/* Set number of ticks */
+		ei.setTicks("SobelFPGAKernel", picSize/n_p);
+
+		ei.ignoreAll(Direction.IN_OUT);
+
+		return ei;
+	}
+
+	public static void main(String[] args) {
+		EngineParameters params	= new EngineParameters(args);
+		SobelFPGAManager manager	= new SobelFPGAManager(params);
+
+		/* Create interface */
+		manager.createSLiCinterface(interfaceSobelFPGA("sobel_fpga"));
+		manager.config.setDefaultStreamClockFrequency(120);
+		//manager.config.setOnCardMemoryFrequency(LMemFrequency.MAX3_333);
+
+		BuildConfig bc = manager.getBuildConfig();
+		bc.setEnableTimingAnalysis(true);
+		bc.setBuildEffort(Effort.HIGH);
+		bc.setMPPRCostTableSearchRange(1,24);
+		bc.setMPPRParallelism(4);
+		bc.setMPPRContinueAfterMeetingTiming(false);
+
+		manager.build();
+	}
+}
